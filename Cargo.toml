@@ -2,7 +2,7 @@
 name = "iosplit"
 version = "0.1.0"
 edition = "2021"
-default-run = "main"
+default-run = "iosplit"
 
 [dependencies]
 anyhow = "1.0.98"
@@ -15,7 +15,7 @@ tokio-stream = "0.1.17"
 
 
 [[bin]]
-name = "main"
+name = "iosplit"
 path = "src/main.rs"
 
 [[bin]]
