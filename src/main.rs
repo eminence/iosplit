@@ -6,9 +6,11 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarState},
 };
-use std::{ffi::OsStr, io::stderr, process::Stdio};
+use std::{collections::VecDeque, ffi::OsStr, io::stderr, process::Stdio};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_stream::StreamExt;
+
+const MAX_LINES: usize = 10_000;
 
 pub fn print_usage(arg0: &OsStr) {
     eprintln!("Usage: {} <command> [args]", arg0.to_string_lossy());
@@ -54,8 +56,8 @@ async fn main() -> anyhow::Result<()> {
 
     let mut terminal = ratatui::init();
 
-    let mut stdout_buf: Vec<String> = Vec::new();
-    let mut stderr_buf: Vec<String> = Vec::new();
+    let mut stdout_buf: VecDeque<String> = VecDeque::new();
+    let mut stderr_buf: VecDeque<String> = VecDeque::new();
 
     // let mut child_running = true;
     let mut read_stdout = true;
@@ -88,7 +90,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                     Ok(bytes) => {
                         let data = String::from_utf8_lossy(&out_buf[..bytes]).into_owned();
-                        stdout_buf.push(data);
+                        stdout_buf.push_back(data);
+                        if stdout_buf.len() > MAX_LINES {
+                            stdout_buf.pop_front();
+                        }
                     }
 
                     _ => {
@@ -103,7 +108,11 @@ async fn main() -> anyhow::Result<()> {
                     }
                     Ok(bytes) => {
                         let data = String::from_utf8_lossy(&err_buf[..bytes]).into_owned();
-                        stderr_buf.push(data);
+                        stderr_buf.push_back(data);
+                        if stderr_buf.len() > MAX_LINES {
+                            stderr_buf.pop_front();
+                        }
+
                     }
                     _ => {
                         read_stderr = false;
@@ -200,12 +209,12 @@ async fn main() -> anyhow::Result<()> {
                 let stderr_width = layout[1].width as usize - 2;
                 let height = layout[0].height as usize - 2;
 
-                let all_stdout = stdout_buf.concat();
+                let all_stdout = stdout_buf.make_contiguous().concat();
                 let o: Vec<_> = textwrap::wrap(&all_stdout, stdout_width)
                     .into_iter()
                     .map(|line| Line::from(line))
                     .collect();
-                let all_stderr = stderr_buf.concat();
+                let all_stderr = stderr_buf.make_contiguous().concat();
                 let e: Vec<_> = textwrap::wrap(&all_stderr, stderr_width)
                     .into_iter()
                     .map(|line| Line::from(line))
